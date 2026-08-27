@@ -26,3 +26,16 @@ curl -X POST http://localhost:8000/v1/benchmark-comparability-dossiers -d '{"ben
 
 ## Pour qui ?
 Devs, auditeurs, ops, chercheurs — qui ont besoin d'une preuve opposable, pas d'un verdict déclaratif.
+
+## Problèmes réglés (détaillés)
+- **Modelforge** → - Preuve / dossier / trace non opposable → résolu par dossier immuable et hash SHA-256
+- **Modelforge** → - Verdict déclaratif sans justification → le dossier expose obligations, fournisseurs et ratios
+- **Modelforge** → - Chaînage caché ou lacune invisible → serveur recharge et recalcule indépendamment du client
+- **Modelforge** → - Tiers qui ne peut pas relancer → le dossier est public et rejouable sans clé client
+
+## Exemples d'utilisation (scénarios réels)
+- **Registry LLM : 2 benchmarks comparables** → le dossier sert de preuve technique (pas d'autorité déclarative)
+- **Sélection modèle : dossier couverture** → le dossier sert de preuve technique (pas d'autorité déclarative)
+- **Audit IA : champion traçable par dataset** → le dossier sert de preuve technique (pas d'autorité déclarative)
+
+
