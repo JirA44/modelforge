@@ -1,3 +1,5 @@
+> **Présentation → [docs/PRESENTATION.md](docs/PRESENTATION.md)** — à quoi ça sert, cas d'usages, usages futurs.
+
 # ModelForge V1.06
 
 ModelForge est un registre de modèles **orienté preuves**. Il conserve les versions et artefacts de
@@ -341,3 +343,4 @@ déploiement.
 Des exemples complets en français sont disponibles dans
 [docs/USAGE_EXAMPLES.md](docs/USAGE_EXAMPLES.md). Les contributions sont décrites dans
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
