@@ -1,4 +1,4 @@
-# Modelforge — Présentation complète
+# ModelForge — Présentation complète
 
 ## Présentation
 modelforge est un registre immuable, hashé (SHA-256), auditable et rejouable.
