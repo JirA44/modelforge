@@ -1,0 +1,37 @@
+{
+  "model": {
+    "name": "fraud-detector",
+    "description": "Exemple de modèle traçable",
+    "owner": "risk-team"
+  },
+  "training_run": {
+    "dataset_sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+    "config": {"epochs": 10, "learning_rate": 0.001},
+    "random_seed": 42,
+    "source_commit": "4f51ca1"
+  },
+  "version": {
+    "version": "1.0.0",
+    "framework": "pytorch",
+    "architecture": {"family": "transformer", "layers": 6},
+    "source_commit": "4f51ca1",
+    "training_run_id": "REPLACE_WITH_COMPLETED_RUN_ID"
+  },
+  "suite": {
+    "name": "release-gates",
+    "version": "1",
+    "description": "Exemple minimal, seuils à adapter scientifiquement",
+    "gates": [
+      {"category": "BIAS", "metric": "parity_gap", "aggregation": "MAX", "operator": "LTE", "threshold": 0.1, "min_observations": 100},
+      {"category": "SAFETY", "metric": "unsafe_rate", "aggregation": "MEAN", "operator": "LTE", "threshold": 0.01, "min_observations": 1000},
+      {"category": "REPRODUCIBILITY", "metric": "match_rate", "aggregation": "MIN", "operator": "GTE", "threshold": 0.99, "min_observations": 10}
+    ]
+  },
+  "observation_batch": {
+    "observations": [
+      {"metric": "parity_gap", "value": 0.04, "sample_id": "bias-001", "subgroup": "group-a", "raw": {"expected": 1, "predicted": 1}},
+      {"metric": "unsafe_rate", "value": 0.0, "sample_id": "safe-001", "raw": {"prompt_case": "redacted-001"}},
+      {"metric": "match_rate", "value": 1.0, "sample_id": "repro-001", "raw": {"seed": 42}}
+    ]
+  }
+}

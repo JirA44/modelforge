@@ -1,0 +1,1032 @@
+openapi: 3.1.0
+info:
+  title: ModelForge
+  version: 1.0.6
+  description: >-
+    Evidence-first model registry. Results, comparisons, robustness, temporal stability,
+    generalization and observed-group performance disparity dossiers are calculated from immutable
+    evidence. BALANCED describes only persisted groups and is not proof of social fairness.
+    No qualification authorizes deployment, promotion or certification.
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /health:
+    get:
+      operationId: health
+      responses:
+        '200':
+          description: Service health
+          content:
+            application/json:
+              schema: {type: object}
+  /info:
+    get:
+      operationId: info
+      responses:
+        '200':
+          description: Service version, capabilities and explicit non-authorization flags
+          content:
+            application/json:
+              schema: {type: object}
+  /models:
+    get:
+      operationId: listModels
+      responses:
+        '200':
+          description: Models
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Model'}
+    post:
+      operationId: createModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ModelCreate'}
+      responses:
+        '201':
+          description: Model created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Model'}
+  /models/{model_id}:
+    parameters:
+      - $ref: '#/components/parameters/ModelId'
+    get:
+      operationId: getModel
+      responses:
+        '200': {description: Model and versions}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /models/{model_id}/training-runs:
+    parameters:
+      - $ref: '#/components/parameters/ModelId'
+    post:
+      operationId: createTrainingRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TrainingRunCreate'}
+      responses:
+        '201': {description: Training run started}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /training-runs/{run_id}/finish:
+    parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: finishTrainingRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TrainingRunFinish'}
+      responses:
+        '200': {description: Terminal training run}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /models/{model_id}/versions:
+    parameters:
+      - $ref: '#/components/parameters/ModelId'
+    post:
+      operationId: createModelVersion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ModelVersionCreate'}
+      responses:
+        '201': {description: Immutable model version created}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /versions/{version_id}:
+    parameters:
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      operationId: getModelVersion
+      responses:
+        '200': {description: Version, artifacts and latest verdict}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /versions/{version_id}/artifacts:
+    parameters:
+      - $ref: '#/components/parameters/VersionId'
+    post:
+      operationId: addArtifact
+      description: Local bytes are decoded and hashed server-side; external hashes remain unverified.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ArtifactCreate'}
+      responses:
+        '201': {description: Immutable artifact registered}
+        '422': {$ref: '#/components/responses/InvalidEvidence'}
+  /benchmark-suites:
+    post:
+      operationId: createBenchmarkSuite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BenchmarkSuiteCreate'}
+      responses:
+        '201': {description: Benchmark suite created}
+        '422': {$ref: '#/components/responses/InvalidEvidence'}
+  /benchmark-suites/{suite_id}:
+    parameters:
+      - name: suite_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getBenchmarkSuite
+      responses:
+        '200': {description: Suite and gates}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /benchmark-sessions:
+    post:
+      operationId: createBenchmarkSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BenchmarkSessionCreate'}
+      responses:
+        '201': {description: Open benchmark session}
+  /benchmark-sessions/{session_id}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      operationId: getBenchmarkSession
+      responses:
+        '200': {description: Session, computed gates and optional verdict}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /benchmark-sessions/{session_id}/observations:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: appendRawObservations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ObservationBatch'}
+      responses:
+        '201': {description: Immutable observations accepted}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/InvalidEvidence'}
+  /benchmark-sessions/{session_id}/close:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: closeAndEvaluateBenchmark
+      description: Computes aggregates, gate statuses and VALIDATED/REJECTED/INSUFFICIENT verdict.
+      responses:
+        '200': {description: Closed session and immutable verdict}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /version-comparisons:
+    post:
+      operationId: createVersionComparison
+      description: >-
+        Compares two closed benchmark sessions from distinct versions of the same model and suite.
+        Qualification, metric deltas and hashes are computed server-side with zero regression tolerance.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VersionComparisonCreate'}
+      responses:
+        '201':
+          description: Immutable, idempotent comparison report
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VersionComparisonReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /version-comparisons/{comparison_id}:
+    parameters:
+      - name: comparison_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getVersionComparison
+      responses:
+        '200':
+          description: Sealed version comparison report
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VersionComparisonReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /robustness-dossiers:
+    post:
+      operationId: createRobustnessDossier
+      description: >-
+        Recomputes metrics and gates from at least two immutable closed sessions for exactly
+        one model version and one suite. Dispersion, worst cases, success rate, provenance
+        consistency, qualifications and report hashes are exclusively server-computed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RobustnessDossierCreate'}
+      responses:
+        '201':
+          description: Immutable, idempotent robustness dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RobustnessDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /robustness-dossiers/{dossier_id}:
+    parameters:
+      - name: dossier_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getRobustnessDossier
+      responses:
+        '200':
+          description: Sealed robustness dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RobustnessDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /temporal-stability-dossiers:
+    post:
+      operationId: createTemporalStabilityDossier
+      description: >-
+        Reloads and recomputes an ordered sequence of at least two closed immutable evaluations.
+        The server verifies model/version, metric contract and dataset comparability, then computes
+        metric and score trajectories, successive deltas, amplitude, worst cases, gate consistency,
+        direction and volatility under fixed server policies. No client score, metric, verdict,
+        result or gate is accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TemporalStabilityDossierCreate'}
+      responses:
+        '201':
+          description: Immutable, idempotent temporal stability dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemporalStabilityDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /temporal-stability-dossiers/{dossier_id}:
+    parameters:
+      - name: dossier_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getTemporalStabilityDossier
+      responses:
+        '200':
+          description: Sealed temporal stability dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemporalStabilityDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /generalization-dossiers:
+    post:
+      operationId: createGeneralizationDossier
+      description: >-
+        Reloads and recomputes 2 to 50 closed immutable evaluations of one model version across
+        at least two bound evaluation datasets. The server verifies metric-contract comparability,
+        groups metrics and scores per dataset, then computes dispersion, worst dataset, amplitude,
+        gates and success rates under a fixed 10% dispersion policy. The request accepts IDs only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GeneralizationDossierCreate'}
+      responses:
+        '201':
+          description: Immutable, idempotent cross-dataset generalization dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GeneralizationDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    get:
+      operationId: listGeneralizationDossiers
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 100}
+      responses:
+        '200':
+          description: Newest sealed generalization dossiers first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/GeneralizationDossierReport'}
+  /generalization-dossiers/{dossier_id}:
+    parameters:
+      - name: dossier_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getGeneralizationDossier
+      responses:
+        '200':
+          description: Sealed cross-dataset generalization dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GeneralizationDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /performance-disparity-dossiers:
+    post:
+      operationId: createPerformanceDisparityDossier
+      description: >-
+        Recomputes 2 to 50 immutable evaluations, selects only persisted non-generic segments when
+        at least two exist, otherwise persisted dataset bindings, and measures observed performance
+        disparity. No protected attribute is inferred and no score, gate, verdict or qualification
+        is accepted from the client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PerformanceDisparityDossierCreate'}
+      responses:
+        '201':
+          description: Immutable, idempotent observed-group disparity dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PerformanceDisparityDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    get:
+      operationId: listPerformanceDisparityDossiers
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 100}
+      responses:
+        '200':
+          description: Newest sealed observed-group disparity dossiers first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/PerformanceDisparityDossierReport'}
+  /performance-disparity-dossiers/{dossier_id}:
+    parameters:
+      - name: dossier_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getPerformanceDisparityDossier
+      responses:
+        '200':
+          description: Sealed observed-group disparity dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PerformanceDisparityDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /performance-drift-dossiers:
+    post:
+      operationId: createPerformanceDriftDossier
+      description: >-
+        Reloads and recomputes 2 to 100 compatible immutable evaluations, ignores request order,
+        orders the timeline by server created_at then id, and calculates absolute/relative deltas,
+        trends, fixed-threshold breaks, worst transition and affected metric groups. No client score,
+        verdict, rank or result is accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PerformanceDriftDossierCreate'}
+      responses:
+        '201':
+          description: Immutable, idempotent chronological performance drift dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PerformanceDriftDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    get:
+      operationId: listPerformanceDriftDossiers
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 100}
+      responses:
+        '200':
+          description: Newest sealed performance drift dossiers first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/PerformanceDriftDossierReport'}
+  /performance-drift-dossiers/{dossier_id}:
+    parameters:
+      - name: dossier_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getPerformanceDriftDossier
+      responses:
+        '200':
+          description: Sealed chronological performance drift dossier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PerformanceDriftDossierReport'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /audit-events:
+    get:
+      operationId: listAuditEvents
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 100}
+      responses:
+        '200': {description: Append-only audit events, newest first}
+components:
+  parameters:
+    ModelId:
+      name: model_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    VersionId:
+      name: version_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Conflict:
+      description: Invalid state transition or duplicate immutable evidence
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    InvalidEvidence:
+      description: Structurally invalid, unverifiable or undeclared evidence
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: {type: string}
+    ModelCreate:
+      type: object
+      additionalProperties: false
+      required: [name, owner]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 160}
+        description: {type: string, maxLength: 4000, default: ''}
+        owner: {type: string, minLength: 1, maxLength: 160}
+    Model:
+      allOf:
+        - $ref: '#/components/schemas/ModelCreate'
+        - type: object
+          required: [id, created_at]
+          properties:
+            id: {type: string, format: uuid}
+            created_at: {type: string, format: date-time}
+    TrainingRunCreate:
+      type: object
+      additionalProperties: false
+      required: [dataset_sha256, config, random_seed, source_commit]
+      properties:
+        dataset_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        config: {type: object}
+        random_seed: {type: integer}
+        source_commit: {type: string, minLength: 1}
+    TrainingRunFinish:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, enum: [COMPLETED, FAILED]}
+        failure_reason: {type: [string, 'null']}
+    ModelVersionCreate:
+      type: object
+      additionalProperties: false
+      required: [version, framework, architecture, source_commit]
+      properties:
+        version: {type: string, minLength: 1}
+        framework: {type: string, minLength: 1}
+        architecture: {type: object}
+        source_commit: {type: string, minLength: 1}
+        training_run_id: {type: [string, 'null'], format: uuid}
+    ArtifactCreate:
+      type: object
+      additionalProperties: false
+      required: [kind, filename]
+      properties:
+        kind: {type: string, enum: [WEIGHTS, TOKENIZER, CONFIG, OTHER]}
+        filename: {type: string, minLength: 1}
+        content_base64: {type: [string, 'null'], contentEncoding: base64}
+        external_uri: {type: [string, 'null']}
+        sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        size_bytes: {type: [integer, 'null'], minimum: 0}
+    GateSpec:
+      type: object
+      additionalProperties: false
+      required: [category, metric, aggregation, operator, threshold, min_observations]
+      properties:
+        category: {type: string, enum: [BIAS, SAFETY, REPRODUCIBILITY]}
+        metric: {type: string, minLength: 1}
+        aggregation: {type: string, enum: [MEAN, MIN, MAX, P05, P95]}
+        operator: {type: string, enum: [LTE, GTE]}
+        threshold: {type: number}
+        min_observations: {type: integer, minimum: 1}
+    BenchmarkSuiteCreate:
+      type: object
+      additionalProperties: false
+      required: [name, version, gates]
+      properties:
+        name: {type: string, minLength: 1}
+        version: {type: string, minLength: 1}
+        description: {type: string, default: ''}
+        gates:
+          type: array
+          minItems: 3
+          items: {$ref: '#/components/schemas/GateSpec'}
+    BenchmarkSessionCreate:
+      type: object
+      additionalProperties: false
+      required: [model_version_id, suite_id]
+      properties:
+        model_version_id: {type: string, format: uuid}
+        suite_id: {type: string, format: uuid}
+        evaluation_dataset_sha256:
+          type: [string, 'null']
+          pattern: '^[0-9a-f]{64}$'
+          description: Immutable evaluation-dataset binding used by cross-dataset analysis.
+    Observation:
+      type: object
+      additionalProperties: false
+      required: [metric, value, sample_id]
+      properties:
+        metric: {type: string, minLength: 1}
+        value: {type: number}
+        sample_id: {type: string, minLength: 1}
+        subgroup: {type: [string, 'null']}
+        raw: {type: object, default: {}}
+    ObservationBatch:
+      type: object
+      additionalProperties: false
+      required: [observations]
+      properties:
+        observations:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items: {$ref: '#/components/schemas/Observation'}
+    VersionComparisonCreate:
+      type: object
+      additionalProperties: false
+      required: [baseline_session_id, candidate_session_id]
+      properties:
+        baseline_session_id: {type: string, format: uuid}
+        candidate_session_id: {type: string, format: uuid}
+    MetricDelta:
+      type: object
+      required:
+        [category, metric, aggregation, operator, baseline_value, candidate_value,
+         delta, direction, is_regression]
+      properties:
+        category: {type: string, enum: [BIAS, SAFETY, REPRODUCIBILITY]}
+        metric: {type: string}
+        aggregation: {type: string, enum: [MEAN, MIN, MAX, P05, P95]}
+        operator: {type: string, enum: [LTE, GTE]}
+        baseline_value: {type: [number, 'null']}
+        candidate_value: {type: [number, 'null']}
+        delta: {type: [number, 'null']}
+        direction: {type: string, enum: [IMPROVED, UNCHANGED, REGRESSED, INSUFFICIENT]}
+        is_regression: {type: boolean}
+    VersionComparisonReport:
+      type: object
+      required:
+        [id, model_id, suite_id, baseline_version_id, candidate_version_id,
+         baseline_session_id, candidate_session_id, qualification, input_sha256,
+         evidence_sha256, report_sha256, reasons, metric_deltas, created_at,
+         automatic_promotion]
+      properties:
+        id: {type: string, format: uuid}
+        model_id: {type: string, format: uuid}
+        suite_id: {type: string, format: uuid}
+        baseline_version_id: {type: string, format: uuid}
+        candidate_version_id: {type: string, format: uuid}
+        baseline_session_id: {type: string, format: uuid}
+        candidate_session_id: {type: string, format: uuid}
+        qualification: {type: string, enum: [ACCEPTABLE, REGRESSED, INSUFFICIENT]}
+        input_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        evidence_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        report_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        reasons:
+          type: array
+          items: {type: string}
+        metric_deltas:
+          type: array
+          items: {$ref: '#/components/schemas/MetricDelta'}
+        created_at: {type: string, format: date-time}
+        automatic_promotion: {type: boolean, const: false}
+    RobustnessDossierCreate:
+      type: object
+      additionalProperties: false
+      required: [session_ids]
+      properties:
+        session_ids:
+          type: array
+          minItems: 2
+          maxItems: 100
+          uniqueItems: true
+          items: {type: string, format: uuid}
+    RobustnessMetricSummary:
+      type: object
+      required:
+        [category, metric, aggregation, operator, threshold, session_values, mean,
+         minimum, maximum, dispersion_range, dispersion_stddev, worst_case,
+         projected_worst_case, stability_buffer_pass, pass_count, success_rate]
+      properties:
+        category: {type: string, enum: [BIAS, SAFETY, REPRODUCIBILITY]}
+        metric: {type: string}
+        aggregation: {type: string, enum: [MEAN, MIN, MAX, P05, P95]}
+        operator: {type: string, enum: [LTE, GTE]}
+        threshold: {type: number}
+        session_values:
+          type: array
+          items: {type: object}
+        mean: {type: [number, 'null']}
+        minimum: {type: [number, 'null']}
+        maximum: {type: [number, 'null']}
+        dispersion_range: {type: [number, 'null']}
+        dispersion_stddev: {type: [number, 'null']}
+        worst_case: {type: [number, 'null']}
+        projected_worst_case: {type: [number, 'null']}
+        stability_buffer_pass: {type: boolean}
+        pass_count: {type: integer, minimum: 0}
+        success_rate: {type: number, minimum: 0, maximum: 1}
+    RobustnessDossierReport:
+      type: object
+      required:
+        [id, model_id, model_version_id, suite_id, session_ids, qualification,
+         success_rate, dataset_sha256, artifact_hashes, consistency, input_sha256,
+         evidence_sha256, report_sha256, reasons, metric_summary, source_evaluations,
+         created_at, automatic_promotion]
+      properties:
+        id: {type: string, format: uuid}
+        model_id: {type: string, format: uuid}
+        model_version_id: {type: string, format: uuid}
+        suite_id: {type: string, format: uuid}
+        session_ids:
+          type: array
+          minItems: 2
+          items: {type: string, format: uuid}
+        qualification: {type: string, enum: [ROBUST, UNSTABLE, INSUFFICIENT]}
+        success_rate: {type: number, minimum: 0, maximum: 1}
+        dataset_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        artifact_hashes:
+          type: array
+          items: {type: string, pattern: '^[0-9a-f]{64}$'}
+        consistency: {type: object}
+        input_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        evidence_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        report_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        reasons:
+          type: array
+          items: {type: string}
+        metric_summary:
+          type: array
+          items: {$ref: '#/components/schemas/RobustnessMetricSummary'}
+        source_evaluations:
+          type: array
+          items: {type: object}
+        created_at: {type: string, format: date-time}
+        automatic_promotion: {type: boolean, const: false}
+    TemporalStabilityDossierCreate:
+      type: object
+      additionalProperties: false
+      required: [evaluation_ids]
+      properties:
+        evaluation_ids:
+          type: array
+          minItems: 2
+          maxItems: 100
+          uniqueItems: true
+          description: Ordered immutable benchmark evaluation identifiers.
+          items: {type: string, format: uuid}
+    TemporalMetricTrajectory:
+      type: object
+      required:
+        [category, metric, aggregation, operator, threshold, points, successive_deltas,
+         amplitude_max, worst_case, net_progress_ratio, direction, volatility_ratio,
+         max_step_ratio, is_volatile, gate_status_consistent, pass_to_fail]
+      properties:
+        category: {type: string, enum: [BIAS, SAFETY, REPRODUCIBILITY]}
+        metric: {type: string}
+        aggregation: {type: string, enum: [MEAN, MIN, MAX, P05, P95]}
+        operator: {type: string, enum: [LTE, GTE]}
+        threshold: {type: number}
+        points:
+          type: array
+          minItems: 2
+          items: {type: object}
+        successive_deltas:
+          type: array
+          minItems: 1
+          items: {type: object}
+        amplitude_max: {type: [number, 'null']}
+        worst_case: {type: [number, 'null']}
+        net_progress_ratio: {type: [number, 'null']}
+        direction: {type: string, enum: [IMPROVING, FLAT, DEGRADING, INSUFFICIENT]}
+        volatility_ratio: {type: [number, 'null']}
+        max_step_ratio: {type: [number, 'null']}
+        is_volatile: {type: boolean}
+        gate_status_consistent: {type: boolean}
+        pass_to_fail: {type: boolean}
+    TemporalStabilityDossierReport:
+      type: object
+      required:
+        [id, anchor_model_id, anchor_model_version_id, anchor_suite_id, evaluation_ids,
+         qualification, policy, compatibility, input_sha256, contract_sha256,
+         evidence_sha256, report_sha256, reasons, score_trajectory, metric_trajectories,
+         source_snapshots, created_at, automatic_promotion, certification]
+      properties:
+        id: {type: string, format: uuid}
+        anchor_model_id: {type: string, format: uuid}
+        anchor_model_version_id: {type: string, format: uuid}
+        anchor_suite_id: {type: string, format: uuid}
+        evaluation_ids:
+          type: array
+          minItems: 2
+          items: {type: string, format: uuid}
+        qualification:
+          type: string
+          enum: [STABLE, DEGRADING, VOLATILE, INSUFFICIENT, INCOMPATIBLE]
+        policy: {type: object}
+        compatibility: {type: object}
+        input_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        contract_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        evidence_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        report_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        reasons:
+          type: array
+          items: {type: string}
+        score_trajectory: {type: object}
+        metric_trajectories:
+          type: array
+          items: {$ref: '#/components/schemas/TemporalMetricTrajectory'}
+        source_snapshots:
+          type: array
+          minItems: 2
+          items: {type: object}
+        created_at: {type: string, format: date-time}
+        automatic_promotion: {type: boolean, const: false}
+        certification: {type: boolean, const: false}
+    GeneralizationDossierCreate:
+      type: object
+      additionalProperties: false
+      required: [evaluation_ids]
+      properties:
+        evaluation_ids:
+          type: array
+          minItems: 2
+          maxItems: 50
+          uniqueItems: true
+          items: {type: string, format: uuid}
+    DatasetGeneralizationSummary:
+      type: object
+      required:
+        [dataset_sha256, evaluation_ids, evaluation_count, server_score, success_rate, metrics]
+      properties:
+        dataset_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        evaluation_ids:
+          type: array
+          items: {type: string, format: uuid}
+        evaluation_count: {type: integer, minimum: 1}
+        server_score: {type: [number, 'null']}
+        success_rate: {type: number, minimum: 0, maximum: 1}
+        metrics:
+          type: array
+          items: {type: object}
+    GeneralizationMetricSummary:
+      type: object
+      required:
+        [category, metric, aggregation, operator, threshold, datasets, dispersion,
+         dispersion_ratio, worst_value, worst_dataset_sha256, gate_status_consistent,
+         all_datasets_pass, dataset_sensitive]
+      properties:
+        category: {type: string, enum: [BIAS, SAFETY, REPRODUCIBILITY]}
+        metric: {type: string}
+        aggregation: {type: string, enum: [MEAN, MIN, MAX, P05, P95]}
+        operator: {type: string, enum: [LTE, GTE]}
+        threshold: {type: number}
+        datasets:
+          type: array
+          minItems: 2
+          items: {type: object}
+        dispersion: {type: [number, 'null']}
+        dispersion_ratio: {type: [number, 'null']}
+        worst_value: {type: [number, 'null']}
+        worst_dataset_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        gate_status_consistent: {type: boolean}
+        all_datasets_pass: {type: boolean}
+        dataset_sensitive: {type: boolean}
+    GeneralizationDossierReport:
+      type: object
+      required:
+        [id, model_id, model_version_id, anchor_suite_id, evaluation_ids, qualification,
+         overall_success_rate, score_dispersion, worst_dataset_sha256, policy, compatibility,
+         input_sha256, contract_sha256, evidence_sha256, report_sha256, reasons,
+         dataset_summaries, metric_summary, source_snapshots, created_at,
+         automatic_promotion, certification]
+      properties:
+        id: {type: string, format: uuid}
+        model_id: {type: string, format: uuid}
+        model_version_id: {type: string, format: uuid}
+        anchor_suite_id: {type: string, format: uuid}
+        evaluation_ids:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items: {type: string, format: uuid}
+        qualification:
+          type: string
+          enum: [GENERALIZES, DATASET_SENSITIVE, INSUFFICIENT, INCOMPATIBLE]
+        overall_success_rate: {type: number, minimum: 0, maximum: 1}
+        score_dispersion: {type: [number, 'null']}
+        worst_dataset_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        policy: {type: object}
+        compatibility: {type: object}
+        input_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        contract_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        evidence_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        report_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        reasons:
+          type: array
+          items: {type: string}
+        dataset_summaries:
+          type: array
+          items: {$ref: '#/components/schemas/DatasetGeneralizationSummary'}
+        metric_summary:
+          type: array
+          items: {$ref: '#/components/schemas/GeneralizationMetricSummary'}
+        source_snapshots:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items: {type: object}
+        created_at: {type: string, format: date-time}
+        automatic_promotion: {type: boolean, const: false}
+        certification: {type: boolean, const: false}
+    PerformanceDisparityDossierCreate:
+      type: object
+      additionalProperties: false
+      required: [evaluation_ids]
+      properties:
+        evaluation_ids:
+          type: array
+          minItems: 2
+          maxItems: 50
+          uniqueItems: true
+          items: {type: string, format: uuid}
+    ObservedGroupPerformanceSummary:
+      type: object
+      required: [group_key, group_kind, evaluation_ids, score, gate_pass_rate, metrics]
+      properties:
+        group_key: {type: string}
+        group_kind: {type: string, enum: [DATASET, SEGMENT]}
+        evaluation_ids:
+          type: array
+          items: {type: string, format: uuid}
+        score: {type: [number, 'null'], minimum: 0, maximum: 1}
+        gate_pass_rate: {type: number, minimum: 0, maximum: 1}
+        metrics:
+          type: array
+          items: {type: object}
+    PerformanceDisparityDossierReport:
+      type: object
+      required:
+        [id, model_id, model_version_id, anchor_suite_id, evaluation_ids, grouping_mode,
+         qualification, observed_group_count, score_max_minus_min, worst_best_ratio,
+         score_dispersion, worst_group_key, policy, compatibility, input_sha256,
+         contract_sha256, evidence_sha256, report_sha256, reasons, group_summaries,
+         metric_summary, source_snapshots, created_at, automatic_promotion, certification,
+         social_fairness_certified, observed_group_disparity_only]
+      properties:
+        id: {type: string, format: uuid}
+        model_id: {type: string, format: uuid}
+        model_version_id: {type: string, format: uuid}
+        anchor_suite_id: {type: string, format: uuid}
+        evaluation_ids:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items: {type: string, format: uuid}
+        grouping_mode: {type: string, enum: [DATASET, SEGMENT, INSUFFICIENT]}
+        qualification: {type: string, enum: [BALANCED, DISPARATE, INSUFFICIENT, INCOMPATIBLE]}
+        observed_group_count: {type: integer, minimum: 0}
+        score_max_minus_min: {type: [number, 'null']}
+        worst_best_ratio: {type: [number, 'null']}
+        score_dispersion: {type: [number, 'null']}
+        worst_group_key: {type: [string, 'null']}
+        policy: {type: object}
+        compatibility: {type: object}
+        input_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        contract_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        evidence_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        report_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        reasons:
+          type: array
+          items: {type: string}
+        group_summaries:
+          type: array
+          items: {$ref: '#/components/schemas/ObservedGroupPerformanceSummary'}
+        metric_summary:
+          type: array
+          items: {type: object}
+        source_snapshots:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items: {type: object}
+        created_at: {type: string, format: date-time}
+        automatic_promotion: {type: boolean, const: false}
+        certification: {type: boolean, const: false}
+        social_fairness_certified: {type: boolean, const: false}
+        observed_group_disparity_only: {type: boolean, const: true}
+    PerformanceDriftDossierCreate:
+      type: object
+      additionalProperties: false
+      required: [evaluation_ids]
+      properties:
+        evaluation_ids:
+          type: array
+          minItems: 2
+          maxItems: 100
+          uniqueItems: true
+          items: {type: string, format: uuid}
+    PerformanceDriftDossierReport:
+      type: object
+      required:
+        [id, model_id, model_version_id, anchor_suite_id, evaluation_ids,
+         chronological_evaluation_ids, qualification, policy, compatibility, input_sha256,
+         contract_sha256, evidence_sha256, report_sha256, reasons, score_trajectory,
+         metric_trajectories, breaks, worst_transition, affected_groups, source_snapshots,
+         created_at, automatic_promotion, deployment, certification]
+      properties:
+        id: {type: string, format: uuid}
+        model_id: {type: string, format: uuid}
+        model_version_id: {type: string, format: uuid}
+        anchor_suite_id: {type: string, format: uuid}
+        evaluation_ids:
+          type: array
+          minItems: 2
+          maxItems: 100
+          uniqueItems: true
+          items: {type: string, format: uuid}
+        chronological_evaluation_ids:
+          type: array
+          minItems: 2
+          maxItems: 100
+          uniqueItems: true
+          items: {type: string, format: uuid}
+        qualification: {type: string, enum: [STABLE, DRIFTING, INSUFFICIENT, INCOMPATIBLE]}
+        policy: {type: object}
+        compatibility: {type: object}
+        input_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        contract_sha256: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        evidence_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        report_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        reasons: {type: array, items: {type: string}}
+        score_trajectory: {type: object}
+        metric_trajectories: {type: array, items: {type: object}}
+        breaks: {type: array, items: {type: object}}
+        worst_transition: {type: [object, 'null']}
+        affected_groups: {type: array, items: {type: string, enum: [BIAS, SAFETY, REPRODUCIBILITY]}}
+        source_snapshots:
+          type: array
+          minItems: 2
+          maxItems: 100
+          items: {type: object}
+        created_at: {type: string, format: date-time}
+        automatic_promotion: {type: boolean, const: false}
+        deployment: {type: boolean, const: false}
+        certification: {type: boolean, const: false}
